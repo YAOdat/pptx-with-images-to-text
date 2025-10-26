@@ -1,4 +1,4 @@
-#!/home/odat/pptx_extract/venv/bin/python3
+#!/home/odat/pptx-with-images-to-text/venv/bin/python3
 
 ##############################################################################
 #

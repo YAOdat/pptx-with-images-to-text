@@ -73,8 +73,21 @@ def upload_file():
         return redirect(url_for('index'))
 
 if __name__ == '__main__':
+    import sys
+    # Disable debug mode in production
     debug = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     host = os.environ.get('HOST', '0.0.0.0')
     port = int(os.environ.get('PORT', 5000))
-    app.run(debug=debug, host=host, port=port)
+    
+    # For production, use Waitress instead of Flask dev server
+    if not debug and '--dev' not in sys.argv:
+        try:
+            from waitress import serve
+            print(f"Starting Waitress server on {host}:{port}")
+            serve(app, host=host, port=port)
+        except ImportError:
+            print("Waitress not installed, using Flask dev server")
+            app.run(debug=debug, host=host, port=port)
+    else:
+        app.run(debug=debug, host=host, port=port)
 
