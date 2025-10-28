@@ -7,9 +7,21 @@ from PIL import Image
 import pytesseract
 from io import BytesIO
 
+# Check if Tesseract is available
+_TESSERACT_AVAILABLE = True
+try:
+    pytesseract.get_tesseract_version()
+except Exception:
+    _TESSERACT_AVAILABLE = False
+
 def extract_text_from_pptx(pptx_path, output_path="pptx_text_output.txt", ocr_langs="eng+ara"):
     if not os.path.isfile(pptx_path):
         raise FileNotFoundError(f"File not found: {pptx_path}")
+
+    # Warn if Tesseract is not available
+    if not _TESSERACT_AVAILABLE:
+        print("⚠️  Warning: Tesseract OCR is not installed. Image text extraction will be skipped.")
+        print("   Install Tesseract to enable OCR: sudo apt-get install tesseract-ocr tesseract-ocr-ara")
 
     prs = Presentation(pptx_path)
     lines = []
@@ -41,24 +53,32 @@ def extract_text_from_pptx(pptx_path, output_path="pptx_text_output.txt", ocr_la
                 except Exception:
                     pass
 
-        # 2) OCR on pictures
-        for shape in slide.shapes:
-            # Detect picture shapes
-            if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
-                try:
-                    image = shape.image
-                    image_bytes = image.blob
-                    img = Image.open(BytesIO(image_bytes)).convert("RGB")
-                    # Run OCR. `ocr_langs` default includes eng+ara; change if needed.
+        # 2) OCR on pictures (skip if Tesseract not available)
+        if _TESSERACT_AVAILABLE:
+            for shape in slide.shapes:
+                # Detect picture shapes
+                if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
                     try:
-                        ocr_text = pytesseract.image_to_string(img, lang=ocr_langs)
-                    except pytesseract.pytesseract.TesseractError:
-                        # fallback to default language if requested langs not installed
-                        ocr_text = pytesseract.image_to_string(img)
-                    if ocr_text and ocr_text.strip():
-                        lines.append("[OCR->Image] " + ocr_text.strip())
-                except Exception as e:
-                    lines.append(f"[OCR->Image Error] {e}")
+                        image = shape.image
+                        image_bytes = image.blob
+                        img = Image.open(BytesIO(image_bytes)).convert("RGB")
+                        # Run OCR. `ocr_langs` default includes eng+ara; change if needed.
+                        try:
+                            ocr_text = pytesseract.image_to_string(img, lang=ocr_langs)
+                            if ocr_text and ocr_text.strip():
+                                lines.append("[OCR->Image] " + ocr_text.strip())
+                        except pytesseract.pytesseract.TesseractError:
+                            # fallback to default language if requested langs not installed
+                            try:
+                                ocr_text = pytesseract.image_to_string(img)
+                                if ocr_text and ocr_text.strip():
+                                    lines.append("[OCR->Image] " + ocr_text.strip())
+                            except:
+                                # If Tesseract not installed, skip OCR silently
+                                pass
+                    except Exception as e:
+                        # Skip OCR errors silently to allow text extraction to continue
+                        pass
 
         # 3) Speaker notes (if present)
         try:
